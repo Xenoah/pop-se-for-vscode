@@ -1,0 +1,180 @@
+* { box-sizing: border-box; }
+
+body {
+  font-family: var(--vscode-font-family);
+  color: var(--vscode-foreground);
+  background: var(--vscode-editor-background);
+  margin: 0;
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ---- 左ナビ ---- */
+#nav {
+  width: 180px;
+  min-width: 180px;
+  border-right: 1px solid var(--vscode-panel-border, #444);
+  padding: 12px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#nav h1 {
+  font-size: 15px;
+  margin: 4px 8px 12px;
+}
+.nav-item {
+  text-align: left;
+  background: transparent;
+  color: var(--vscode-foreground);
+  border: none;
+  padding: 7px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.nav-item:hover { background: var(--vscode-list-hoverBackground); }
+.nav-item.active {
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+#engine-status {
+  margin-top: auto;
+  font-size: 11px;
+  opacity: 0.75;
+  padding: 8px;
+  line-height: 1.5;
+}
+#engine-status .ok { color: var(--vscode-testing-iconPassed, #73c991); }
+#engine-status .ng { color: var(--vscode-editorWarning-foreground, #cca700); }
+
+/* ---- メイン ---- */
+#main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 26px 60px;
+}
+.section { display: none; max-width: 860px; }
+.section.active { display: block; }
+.section h2 { font-size: 17px; margin: 6px 0 4px; }
+.section .desc { opacity: 0.75; font-size: 12.5px; margin-bottom: 16px; }
+
+/* ---- 共通コントロール ---- */
+button.action {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  padding: 5px 14px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+button.action:hover { background: var(--vscode-button-hoverBackground); }
+button.secondary {
+  background: var(--vscode-button-secondaryBackground, #3a3d41);
+  color: var(--vscode-button-secondaryForeground, #fff);
+}
+button.secondary:hover { background: var(--vscode-button-secondaryHoverBackground, #45494e); }
+button.danger {
+  background: var(--vscode-inputValidation-errorBackground, #5a1d1d);
+  color: var(--vscode-errorForeground, #f48771);
+  border: 1px solid var(--vscode-errorForeground, #f48771);
+}
+button.test {
+  background: transparent;
+  border: 1px solid var(--vscode-button-border, var(--vscode-panel-border, #555));
+  color: var(--vscode-foreground);
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 3px 9px;
+  font-size: 12px;
+}
+button.test:hover { background: var(--vscode-list-hoverBackground); }
+
+input[type="text"], input[type="number"], select {
+  background: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: 1px solid var(--vscode-input-border, transparent);
+  border-radius: 2px;
+  padding: 4px 6px;
+  font-size: 12.5px;
+  font-family: inherit;
+}
+input[type="range"] { vertical-align: middle; }
+label.check { display: flex; align-items: center; gap: 7px; font-size: 13px; padding: 4px 0; cursor: pointer; }
+
+/* ---- Preset ---- */
+.preset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+.preset-card {
+  border: 1px solid var(--vscode-panel-border, #444);
+  border-radius: 6px;
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.preset-card:hover { background: var(--vscode-list-hoverBackground); }
+.preset-card.current {
+  border-color: var(--vscode-focusBorder, #007fd4);
+  background: var(--vscode-list-activeSelectionBackground);
+}
+.preset-card h3 { margin: 0 0 6px; font-size: 14px; }
+.preset-card p { margin: 0 0 10px; font-size: 12px; opacity: 0.8; line-height: 1.5; }
+.preset-card .badge {
+  font-size: 10.5px;
+  color: var(--vscode-badge-foreground);
+  background: var(--vscode-badge-background);
+  border-radius: 8px;
+  padding: 1px 8px;
+  margin-left: 6px;
+}
+
+/* ---- Custom Sounds ---- */
+.slot-card {
+  border: 1px solid var(--vscode-panel-border, #444);
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+}
+.slot-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.slot-head .slot-no { font-weight: 600; font-size: 12px; opacity: 0.7; width: 24px; }
+.slot-head input.slot-name { width: 180px; font-weight: 600; }
+.slot-body { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; font-size: 12.5px; }
+.slot-body .field { display: flex; align-items: center; gap: 6px; }
+.slot-file-path {
+  max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  opacity: 0.75; font-size: 11.5px; direction: rtl; text-align: left;
+}
+.slot-desc { width: 100%; }
+.slot-desc input { width: 100%; }
+
+/* ---- Event Mapping ---- */
+.event-group h3 {
+  font-size: 13px;
+  margin: 18px 0 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--vscode-panel-border, #444);
+}
+table.event-table { border-collapse: collapse; width: 100%; }
+table.event-table td { padding: 4px 8px 4px 0; font-size: 12.5px; }
+table.event-table td.ev-label { width: 200px; }
+table.event-table select { min-width: 240px; }
+tr.disabled td.ev-label { opacity: 0.5; }
+
+/* ---- Volume / Advanced ---- */
+.form-row { display: flex; align-items: center; gap: 12px; margin: 12px 0; font-size: 13px; }
+.form-row .row-label { width: 210px; }
+.form-row .val { width: 42px; text-align: right; font-variant-numeric: tabular-nums; opacity: 0.85; }
+.hint { font-size: 11.5px; opacity: 0.65; margin: 2px 0 14px 0; }
+
+/* ---- Reset ---- */
+.danger-zone {
+  border: 1px solid var(--vscode-errorForeground, #f48771);
+  border-radius: 6px;
+  padding: 14px 18px;
+  margin-top: 10px;
+}
+.io-zone { margin-top: 26px; display: flex; gap: 10px; }

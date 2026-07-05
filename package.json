@@ -1,0 +1,220 @@
+{
+  "name": "pop-se",
+  "displayName": "Pop SE - Sound Theme Engine",
+  "description": "VS Code Sound Theme Engine: play sound effects on typing, save, terminal, build, and diagnostics events. Preset themes + 10 custom sound slots.",
+  "version": "0.1.0",
+  "publisher": "xenoah",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.93.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "sound",
+    "sound effects",
+    "typing sounds",
+    "keyboard sounds",
+    "audio feedback"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "popSeEngine",
+          "title": "Sound Engine",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "popSeEngine": [
+        {
+          "type": "webview",
+          "id": "popSe.audioEngine",
+          "name": "Sound Engine",
+          "when": "config.popSe.enabled"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "popSe.openSettings",
+        "title": "サウンド設定画面を開く (Open Sound Settings)",
+        "category": "Pop SE"
+      },
+      {
+        "command": "popSe.applyPreset",
+        "title": "プリセットテーマを適用 (Apply Preset Theme)",
+        "category": "Pop SE"
+      },
+      {
+        "command": "popSe.pickCustomSoundFile",
+        "title": "カスタム音スロットに音声ファイルを割り当て (Pick Custom Sound File)",
+        "category": "Pop SE"
+      },
+      {
+        "command": "popSe.testSound",
+        "title": "サウンドをテスト再生 (Test Sound)",
+        "category": "Pop SE"
+      },
+      {
+        "command": "popSe.toggleEnabled",
+        "title": "サウンドの有効/無効を切り替え (Toggle Sounds)",
+        "category": "Pop SE"
+      },
+      {
+        "command": "popSe.resetAll",
+        "title": "オールリセット (Reset All Sound Settings)",
+        "category": "Pop SE"
+      },
+      {
+        "command": "popSe.diagnose",
+        "title": "サウンド診断 (Diagnose Audio)",
+        "category": "Pop SE"
+      },
+      {
+        "command": "popSe.exportSettings",
+        "title": "設定をエクスポート (Export Settings)",
+        "category": "Pop SE"
+      },
+      {
+        "command": "popSe.importSettings",
+        "title": "設定をインポート (Import Settings)",
+        "category": "Pop SE"
+      }
+    ],
+    "configuration": {
+      "title": "Pop SE (Sound Theme Engine)",
+      "properties": {
+        "popSe.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "拡張機能全体の有効/無効。無効にするとすべてのイベント音が停止します。"
+        },
+        "popSe.masterVolume": {
+          "type": "number",
+          "default": 0.6,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "マスター音量 (0.0〜1.0)。"
+        },
+        "popSe.preset": {
+          "type": "string",
+          "default": "classicPc",
+          "enum": [
+            "classicPc",
+            "retroGame",
+            "mechanicalKeyboard",
+            "sciFiConsole",
+            "robotTerminal",
+            "minimalUi",
+            "alertHeavy",
+            "silentAssistant"
+          ],
+          "enumDescriptions": [
+            "Classic PC — 昔のPCスピーカー風ビープ音",
+            "Retro Game — 8bitゲーム機風",
+            "Mechanical Keyboard — メカニカルキーボードの打鍵音",
+            "Sci-Fi Console — SF風コンソール音",
+            "Robot Terminal — ロボット/ローファイ端末風",
+            "Minimal UI — ごく控えめな通知音のみ",
+            "Alert Heavy — タイプ音なし・通知音強め",
+            "Silent Assistant — すべて無音"
+          ],
+          "description": "現在のプリセットテーマ。変更するとイベント割り当てが一括適用されます。"
+        },
+        "popSe.typing.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "タイプ音の有効/無効。"
+        },
+        "popSe.typing.volume": {
+          "type": "number",
+          "default": 0.5,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "タイプ音の音量 (0.0〜1.0)。"
+        },
+        "popSe.typing.pitchRandomization": {
+          "type": "boolean",
+          "default": true,
+          "description": "通常入力音のピッチをわずかにランダム化して単調さを防ぎます。"
+        },
+        "popSe.typing.cooldownMs": {
+          "type": "number",
+          "default": 25,
+          "minimum": 0,
+          "maximum": 500,
+          "description": "タイプ音の最小発音間隔 (ミリ秒)。連打時の間引きに使われます。"
+        },
+        "popSe.typing.maxVoices": {
+          "type": "number",
+          "default": 8,
+          "minimum": 1,
+          "maximum": 32,
+          "description": "タイプ音の同時再生数上限。超えた場合は最も古い音を停止します。"
+        },
+        "popSe.notification.volume": {
+          "type": "number",
+          "default": 0.7,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "通知音 (保存・エラー・タスク・ターミナル等) の音量 (0.0〜1.0)。"
+        },
+        "popSe.diagnostics.cooldownMs": {
+          "type": "number",
+          "default": 1500,
+          "minimum": 0,
+          "maximum": 60000,
+          "description": "Diagnostics音 (エラー/警告) の最小発音間隔 (ミリ秒)。連続発火を抑制します。"
+        },
+        "popSe.lowLatencyMode": {
+          "type": "boolean",
+          "default": true,
+          "description": "低遅延モード。AudioContextをinteractive設定で常時稼働させ、タイプ音の遅延を最小化します。"
+        },
+        "popSe.autoStartEngine": {
+          "type": "boolean",
+          "default": true,
+          "description": "起動時にSound Engineビューを自動的に初期化します。無効の場合、パネルのSound Engineビューを一度表示するまで音は鳴りません。"
+        },
+        "popSe.debugLog": {
+          "type": "boolean",
+          "default": false,
+          "description": "デバッグログ (出力パネル) の有効/無効。イベント名と状態のみを記録し、入力内容は記録しません。"
+        },
+        "popSe.eventMap": {
+          "type": "object",
+          "default": {},
+          "markdownDescription": "イベントごとの音割り当て。通常は設定画面 (`Pop SE: サウンド設定画面を開く`) から編集してください。値は `{\"<eventId>\": {\"sound\": \"none|preset:<id>|slot:<1-10>\", \"enabled\": true}}` 形式です。",
+          "additionalProperties": true
+        },
+        "popSe.customSlots": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "カスタム音スロット (固定10枠)。通常は設定画面から編集してください。",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.93.0",
+    "typescript": "^5.4.0"
+  }
+}
