@@ -3,14 +3,16 @@ import * as path from 'path';
 import { AudioEngineHost, makeNonce } from './audioEngineHost';
 import { SoundService } from './soundService';
 import {
-  getEventMap, getPresetId, getSettings, getSlots, saveEventMap, saveSlots, setSetting,
-  applyPreset as applyPresetConfig,
+  addSlot, deleteUserPreset, getEventMap, getPresetKey, getSettings, getSlots,
+  getUserPresets, removeLastSlot, saveCurrentAsUserPreset, saveEventMap, saveSlots,
+  setSetting, applyPreset as applyPresetConfig,
 } from './config';
-import { PRESET_THEMES, PresetId, PRESET_MAP } from './presets';
+import { PRESET_THEMES } from './presets';
 import { SOUND_RECIPES } from './soundRecipes';
 import {
-  ALL_EVENT_IDS, EVENT_CATEGORY, EVENT_LABEL_JA, EventId, SoundRef,
-  SUPPORTED_AUDIO_EXTENSIONS,
+  ALL_EVENT_IDS, EVENT_CATEGORY, EVENT_LABEL_JA, EventId, MAX_SLOT_COUNT,
+  MAX_USER_PRESETS, MIN_SLOT_COUNT, SoundRef, SUPPORTED_AUDIO_EXTENSIONS,
+  USER_PRESET_PREFIX,
 } from './types';
 import { hasShellIntegrationApi } from './listeners';
 import { debug } from './log';
@@ -84,10 +86,16 @@ export class SettingsPanel {
       cmd: 'state',
       state: {
         settings,
-        currentPreset: getPresetId(),
+        currentPreset: getPresetKey(),
         eventMap: getEventMap(),
         slots: getSlots(),
+        minSlots: MIN_SLOT_COUNT,
+        maxSlots: MAX_SLOT_COUNT,
         presets: PRESET_THEMES.map((t) => ({ id: t.id, label: t.label, description: t.description })),
+        userPresets: getUserPresets().map((p) => ({
+          id: USER_PRESET_PREFIX + p.id, label: p.label,
+        })),
+        maxUserPresets: MAX_USER_PRESETS,
         recipes: SOUND_RECIPES.map((r) => ({ id: r.id, label: r.label })),
         events: ALL_EVENT_IDS.map((id) => ({
           id, label: EVENT_LABEL_JA[id], category: EVENT_CATEGORY[id],
@@ -107,14 +115,70 @@ export class SettingsPanel {
           break;
 
         case 'applyPreset': {
-          const id = String(msg.presetId);
-          if (PRESET_MAP.has(id)) {
-            await applyPresetConfig(id as PresetId);
-            debug(`preset applied from settings panel: ${id}`);
-            // 適用したテーマの保存音を鳴らしてフィードバック
-            const feedback = PRESET_MAP.get(id)!.map.fileSave;
-            if (feedback !== 'none') { this.testPlay(feedback); }
+          const key = String(msg.presetId);
+          await applyPresetConfig(key);
+          debug(`preset applied from settings panel: ${key}`);
+          // 適用したテーマの保存音を鳴らしてフィードバック
+          const feedback = getEventMap().fileSave;
+          if (feedback && feedback.sound !== 'none') { this.testPlay(feedback.sound); }
+          break;
+        }
+
+        case 'saveUserPreset': {
+          const label = await vscode.window.showInputBox({
+            title: '現在の設定をプリセットとして保存',
+            prompt: 'プリセット名を入力してください (40文字まで)',
+            validateInput: (v) => v.trim() ? undefined : '名前を入力してください',
+          });
+          if (label) {
+            const preset = await saveCurrentAsUserPreset(label.trim());
+            debug('user preset saved');
+            void vscode.window.showInformationMessage(`Pop SE: プリセット「${preset.label}」を保存しました。`);
           }
+          break;
+        }
+
+        case 'deleteUserPreset': {
+          const key = String(msg.presetId);
+          if (!key.startsWith(USER_PRESET_PREFIX)) { break; }
+          const id = key.slice(USER_PRESET_PREFIX.length);
+          const target = getUserPresets().find((p) => p.id === id);
+          if (!target) { break; }
+          const DELETE = '削除';
+          const answer = await vscode.window.showWarningMessage(
+            `ユーザープリセット「${target.label}」を削除しますか？`,
+            { modal: true },
+            DELETE
+          );
+          if (answer === DELETE) {
+            await deleteUserPreset(id);
+          }
+          break;
+        }
+
+        case 'addSlot': {
+          const slot = await addSlot();
+          if (!slot) {
+            void vscode.window.showWarningMessage(`Pop SE: カスタム音スロットは最大${MAX_SLOT_COUNT}枠です。`);
+          }
+          break;
+        }
+
+        case 'removeSlot': {
+          const slots = getSlots();
+          if (slots.length <= MIN_SLOT_COUNT) { break; }
+          const last = slots[slots.length - 1];
+          if (last.type !== 'none') {
+            const REMOVE = '削除';
+            const answer = await vscode.window.showWarningMessage(
+              `スロット #${last.id}「${last.name}」には音源が設定されています。削除しますか？`,
+              { modal: true },
+              REMOVE
+            );
+            if (answer !== REMOVE) { break; }
+          }
+          await removeLastSlot();
+          await this.engine.preloadAllSlots();
           break;
         }
 

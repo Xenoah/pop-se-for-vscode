@@ -75,6 +75,12 @@ export function activate(context: vscode.ExtensionContext): void {
         void engine.ensureStarted(false);
       }
     }, 1500);
+    // workbench復元と競合して初回のfocusが失敗することがあるため、一度だけ再試行する
+    setTimeout(() => {
+      if (engine && !engine.isRunning() && getSettings().enabled) {
+        void engine.ensureStarted(true);
+      }
+    }, 8000);
   }
 
   debug('activated');

@@ -39,6 +39,7 @@ export class AudioEngineHost implements vscode.WebviewViewProvider {
   private statusWaiters: Array<(s: EngineStatus) => void> = [];
   private lastStatus: EngineStatus = { running: false };
   private startAttempted = false;
+  private blockedNotified = false;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -99,6 +100,21 @@ export class AudioEngineHost implements vscode.WebviewViewProvider {
           `Pop SE: カスタム${msg.slotId} の音声ファイルをデコードできませんでした。対応形式: ${SUPPORTED_AUDIO_EXTENSIONS.join(', ')}`
         );
         break;
+      case 'audioBlocked': {
+        // 自動再生制限でAudioContextを開始できない。ユーザー操作 (ビュー内クリック) が必要。
+        if (this.blockedNotified) { break; }
+        this.blockedNotified = true;
+        info('audio blocked by autoplay policy; user gesture required');
+        void vscode.window.showWarningMessage(
+          'Pop SE: 音声の自動再生がブロックされています。パネルの「Sound Engine」ビュー内の「🔊 音声を有効化」ボタンをクリックしてください。',
+          'Sound Engineを表示'
+        ).then((answer) => {
+          if (answer) {
+            void vscode.commands.executeCommand(`${AUDIO_ENGINE_VIEW_ID}.focus`);
+          }
+        });
+        break;
+      }
       case 'log':
         debug(`[engine] ${msg.message}`);
         break;
@@ -124,6 +140,13 @@ export class AudioEngineHost implements vscode.WebviewViewProvider {
   /** file型スロットの音声ファイルをすべて読み込んでWebviewへ転送する */
   async preloadAllSlots(): Promise<void> {
     const slots = buildEngineConfig().slots;
+    // 削除されたスロット (現在の枠数より大きいid) のキャッシュを破棄
+    for (const loadedId of [...this.loadedSlotPaths.keys()]) {
+      if (loadedId > slots.length) {
+        this.loadedSlotPaths.delete(loadedId);
+        this.post({ type: 'clearSlot', slotId: loadedId });
+      }
+    }
     for (const slot of slots) {
       await this.preloadSlot(slot);
     }
@@ -245,8 +268,12 @@ export class AudioEngineHost implements vscode.WebviewViewProvider {
 </head>
 <body>
   <div class="row">🔊 Pop SE — Sound Engine</div>
-  <div class="row">AudioContext: <span id="ctx-state">initializing...</span></div>
-  <div class="row">キャッシュ済みカスタム音: <span id="cached">0</span> / 10</div>
+  <div class="row">AudioContext: <span id="ctx-state">initializing...</span>
+    <button id="unlock" style="display:none; margin-left:8px; cursor:pointer;
+      background: var(--vscode-button-background); color: var(--vscode-button-foreground);
+      border: none; border-radius: 3px; padding: 2px 10px; font-size: 12px;">🔊 音声を有効化</button>
+  </div>
+  <div class="row">キャッシュ済みカスタム音: <span id="cached">0</span></div>
   <div class="row" style="opacity:0.6">このビューは音声再生エンジンです。閉じると音が鳴らなくなります。</div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>

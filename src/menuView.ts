@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
-import { getPresetId, getSettings } from './config';
-import { PRESET_MAP } from './presets';
+import { getPresetLabel, getSettings } from './config';
 import { AudioEngineHost, AUDIO_ENGINE_VIEW_ID } from './audioEngineHost';
 
 export const MENU_VIEW_ID = 'popSe.menu';
@@ -41,7 +40,6 @@ export class MenuViewProvider implements vscode.TreeDataProvider<MenuEntry> {
   getChildren(element?: MenuEntry): MenuEntry[] {
     if (element) { return []; }
     const s = getSettings();
-    const preset = PRESET_MAP.get(getPresetId());
     const engineRunning = this.engine.isRunning();
 
     return [
@@ -54,7 +52,7 @@ export class MenuViewProvider implements vscode.TreeDataProvider<MenuEntry> {
       },
       {
         label: 'プリセット',
-        description: preset?.label ?? '-',
+        description: getPresetLabel(),
         icon: 'symbol-color',
         commandId: 'popSe.applyPreset',
         tooltip: 'クリックでプリセットテーマを選択して一括適用',
@@ -70,6 +68,11 @@ export class MenuViewProvider implements vscode.TreeDataProvider<MenuEntry> {
         label: 'サウンド設定画面を開く',
         icon: 'settings-gear',
         commandId: 'popSe.openSettings',
+      },
+      {
+        label: '現在の設定をプリセットとして保存',
+        icon: 'save-as',
+        commandId: 'popSe.saveUserPreset',
       },
       {
         label: 'カスタム音ファイルを割り当て',

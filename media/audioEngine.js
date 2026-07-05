@@ -25,22 +25,77 @@
   // voice = { nodes: [source...], gain, endTime, typing }
   const activeVoices = new Set();
 
+  // 自動再生制限対策:
+  // AudioContextがsuspendedの間に届いた通知音は保留し、resume成功時にまとめて再生する。
+  // (タイプ音は遅延再生すると不自然なので保留しない)
+  const PENDING_TTL_MS = 5000;
+  const PENDING_MAX = 8;
+  const pendingPlays = [];            // { msg, at }
+  let resumeTimer = null;
+  let resumeAttempts = 0;
+  let blockedReported = false;
+
   const stateEl = document.getElementById('ctx-state');
   const cachedEl = document.getElementById('cached');
+  const unlockBtn = document.getElementById('unlock');
 
   function log(message) {
     vscode.postMessage({ type: 'log', message: String(message) });
   }
 
   function updateStatusUi() {
+    const running = !!ctx && ctx.state === 'running';
     if (stateEl) {
       const s = ctx ? ctx.state : 'not created';
       stateEl.textContent = s;
-      stateEl.className = s === 'running' ? 'state-running' : 'state-suspended';
+      stateEl.className = running ? 'state-running' : 'state-suspended';
     }
     if (cachedEl) {
-      cachedEl.textContent = String(slotBuffers.size);
+      const total = config && Array.isArray(config.slots) ? config.slots.length : 0;
+      cachedEl.textContent = slotBuffers.size + ' / ' + total + '枠';
     }
+    if (unlockBtn) {
+      unlockBtn.style.display = ctx && !running ? 'inline-block' : 'none';
+    }
+  }
+
+  function flushPendingPlays() {
+    const now = performance.now();
+    const queued = pendingPlays.splice(0);
+    for (const item of queued) {
+      if (now - item.at <= PENDING_TTL_MS) {
+        handlePlay(item.msg);
+      }
+    }
+  }
+
+  function tryResume() {
+    if (!ctx || ctx.state !== 'suspended') { return; }
+    ctx.resume().catch(() => { /* ユーザー操作待ち。リトライタイマーで再試行 */ });
+  }
+
+  /** resumeが成功するまで1秒間隔で再試行し、5回失敗したらHostへ通知する */
+  function scheduleResumeRetry() {
+    if (resumeTimer) { return; }
+    resumeAttempts = 0;
+    resumeTimer = setInterval(() => {
+      if (!ctx || ctx.state === 'running') {
+        clearInterval(resumeTimer);
+        resumeTimer = null;
+        return;
+      }
+      resumeAttempts++;
+      tryResume();
+      if (resumeAttempts === 5 && !blockedReported) {
+        blockedReported = true;
+        vscode.postMessage({ type: 'audioBlocked' });
+        log('AudioContext still suspended after retries (autoplay policy?)');
+      }
+      if (resumeAttempts >= 30) {
+        clearInterval(resumeTimer);
+        resumeTimer = null;
+      }
+    }, 1000);
   }
 
   function ensureContext() {
@@ -54,13 +109,33 @@
       notifGain = ctx.createGain();
       notifGain.connect(masterGain);
       noiseBuffer = createNoiseBuffer(ctx);
-      ctx.addEventListener('statechange', updateStatusUi);
-      log('AudioContext created (' + ctx.sampleRate + 'Hz)');
+      ctx.addEventListener('statechange', () => {
+        updateStatusUi();
+        if (ctx.state === 'running') {
+          log('AudioContext running');
+          flushPendingPlays();
+        }
+      });
+      log('AudioContext created (' + ctx.sampleRate + 'Hz, state=' + ctx.state + ')');
     }
     if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => { /* 次のメッセージ時に再試行 */ });
+      tryResume();
+      scheduleResumeRetry();
     }
     updateStatusUi();
+  }
+
+  // Webview内のあらゆるユーザー操作をresumeの契機にする (自動再生制限の解除)
+  for (const evName of ['pointerdown', 'keydown', 'click']) {
+    window.addEventListener(evName, () => {
+      if (ctx && ctx.state === 'suspended') { tryResume(); }
+    }, true);
+  }
+  if (unlockBtn) {
+    unlockBtn.addEventListener('click', () => {
+      ensureContext();
+      tryResume();
+    });
   }
 
   function createNoiseBuffer(audioCtx) {
@@ -255,7 +330,14 @@
   function handlePlay(msg) {
     if (!config || !config.enabled) { return; }
     ensureContext();
-    if (ctx.state !== 'running') { return; }
+    if (ctx.state !== 'running') {
+      // 通知音はresume成功後に再生できるよう保留する (タイプ音は捨てる)
+      if (!msg.typing && String(msg.sound || 'none') !== 'none') {
+        if (pendingPlays.length >= PENDING_MAX) { pendingPlays.shift(); }
+        pendingPlays.push({ msg, at: performance.now() });
+      }
+      return;
+    }
 
     const isTyping = !!msg.typing;
 

@@ -1,7 +1,8 @@
 import * as vscode from 'vscode';
 import {
   ALL_EVENT_IDS, CustomSlot, EngineConfig, EventId, EventMap, EventSetting,
-  SLOT_COUNT, SoundRef,
+  MAX_SLOT_COUNT, MAX_USER_PRESETS, MIN_SLOT_COUNT, SoundRef, USER_PRESET_PREFIX,
+  UserPreset,
 } from './types';
 import { buildEventMapFromPreset, PRESET_MAP, PresetId } from './presets';
 import { isValidRecipeId } from './soundRecipes';
@@ -17,34 +18,48 @@ function clamp01(v: unknown, fallback: number): number {
   return Math.min(1, Math.max(0, n));
 }
 
-export function defaultSlots(): CustomSlot[] {
+function defaultSlot(id: number): CustomSlot {
+  return {
+    id,
+    name: `カスタム${id}`,
+    enabled: true,
+    type: 'none',
+    filePath: '',
+    volume: 0.8,
+    cooldownMs: 50,
+    description: '',
+  };
+}
+
+export function defaultSlots(count = MIN_SLOT_COUNT): CustomSlot[] {
   const slots: CustomSlot[] = [];
-  for (let i = 1; i <= SLOT_COUNT; i++) {
-    slots.push({
-      id: i,
-      name: `カスタム${i}`,
-      enabled: true,
-      type: 'none',
-      filePath: '',
-      volume: 0.8,
-      cooldownMs: 50,
-      description: '',
-    });
+  for (let i = 1; i <= count; i++) {
+    slots.push(defaultSlot(i));
   }
   return slots;
 }
 
-/** 保存値がどんな形でも固定10枠のスロット配列に正規化する */
+/**
+ * 保存値がどんな形でもスロット配列 (連番id、10〜100枠) に正規化する。
+ * 枠数は保存されている最大idを維持する (最低10、最大100)。
+ */
 export function normalizeSlots(raw: unknown): CustomSlot[] {
-  const slots = defaultSlots();
   if (!Array.isArray(raw)) {
-    return slots;
+    return defaultSlots();
   }
+  let maxId = MIN_SLOT_COUNT;
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') { continue; }
+    const id = typeof (item as { id?: unknown }).id === 'number'
+      ? Math.floor((item as { id: number }).id) : NaN;
+    if (!Number.isNaN(id) && id > maxId && id <= MAX_SLOT_COUNT) { maxId = id; }
+  }
+  const slots = defaultSlots(maxId);
   for (const item of raw) {
     if (!item || typeof item !== 'object') { continue; }
     const o = item as Partial<CustomSlot>;
     const id = typeof o.id === 'number' ? Math.floor(o.id) : NaN;
-    if (id < 1 || id > SLOT_COUNT || Number.isNaN(id)) { continue; }
+    if (id < 1 || id > maxId || Number.isNaN(id)) { continue; }
     const slot = slots[id - 1];
     if (typeof o.name === 'string' && o.name.trim()) { slot.name = o.name.slice(0, 60); }
     if (typeof o.enabled === 'boolean') { slot.enabled = o.enabled; }
@@ -69,9 +84,118 @@ export async function saveSlots(slots: CustomSlot[]): Promise<void> {
   await cfg().update('customSlots', slots, vscode.ConfigurationTarget.Global);
 }
 
-export function getPresetId(): PresetId {
-  const id = cfg().get<string>('preset', 'classicPc');
-  return (PRESET_MAP.has(id) ? id : 'classicPc') as PresetId;
+/** スロットを1枠追加する (最大100)。追加したスロットを返す。 */
+export async function addSlot(): Promise<CustomSlot | undefined> {
+  const slots = getSlots();
+  if (slots.length >= MAX_SLOT_COUNT) { return undefined; }
+  const slot = defaultSlot(slots.length + 1);
+  slots.push(slot);
+  await saveSlots(slots);
+  return slot;
+}
+
+/** 末尾のスロットを削除する (10枠までは削除不可)。削除したら true。 */
+export async function removeLastSlot(): Promise<boolean> {
+  const slots = getSlots();
+  if (slots.length <= MIN_SLOT_COUNT) { return false; }
+  slots.pop();
+  await saveSlots(slots);
+  return true;
+}
+
+// ---- プリセット (組み込み + ユーザー保存) ----
+
+/**
+ * 現在のプリセットキー。組み込みのPresetId または 'user:<id>'。
+ * 保存値が不正 (存在しないユーザープリセット等) なら 'classicPc' に落とす。
+ */
+export function getPresetKey(): string {
+  const key = cfg().get<string>('preset', 'classicPc');
+  if (PRESET_MAP.has(key)) { return key; }
+  if (key.startsWith(USER_PRESET_PREFIX)) {
+    const id = key.slice(USER_PRESET_PREFIX.length);
+    if (getUserPresets().some((p) => p.id === id)) { return key; }
+  }
+  return 'classicPc';
+}
+
+export function getPresetLabel(): string {
+  const key = getPresetKey();
+  if (key.startsWith(USER_PRESET_PREFIX)) {
+    const id = key.slice(USER_PRESET_PREFIX.length);
+    return getUserPresets().find((p) => p.id === id)?.label ?? key;
+  }
+  return PRESET_MAP.get(key)?.label ?? key;
+}
+
+function normalizeEventMap(raw: unknown): EventMap {
+  const map: EventMap = {};
+  if (!raw || typeof raw !== 'object') { return map; }
+  for (const eventId of ALL_EVENT_IDS) {
+    const entry = (raw as Record<string, unknown>)[eventId];
+    if (!entry || typeof entry !== 'object') { continue; }
+    const e = entry as { sound?: unknown; enabled?: unknown };
+    const sound = normalizeSoundRef(e.sound);
+    if (sound !== undefined) {
+      map[eventId] = { sound, enabled: e.enabled !== false };
+    }
+  }
+  return map;
+}
+
+export function normalizeUserPresets(raw: unknown): UserPreset[] {
+  if (!Array.isArray(raw)) { return []; }
+  const result: UserPreset[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') { continue; }
+    const o = item as Partial<UserPreset>;
+    if (typeof o.id !== 'string' || !o.id.trim() || seen.has(o.id)) { continue; }
+    if (typeof o.label !== 'string' || !o.label.trim()) { continue; }
+    seen.add(o.id);
+    result.push({
+      id: o.id,
+      label: o.label.slice(0, 40),
+      map: normalizeEventMap(o.map),
+    });
+    if (result.length >= MAX_USER_PRESETS) { break; }
+  }
+  return result;
+}
+
+export function getUserPresets(): UserPreset[] {
+  return normalizeUserPresets(cfg().get('userPresets'));
+}
+
+export async function saveUserPresets(presets: UserPreset[]): Promise<void> {
+  await cfg().update('userPresets', presets, vscode.ConfigurationTarget.Global);
+}
+
+/** 現在のイベント割り当てをユーザープリセットとして保存し、そのプリセットを選択状態にする */
+export async function saveCurrentAsUserPreset(label: string): Promise<UserPreset> {
+  const presets = getUserPresets();
+  if (presets.length >= MAX_USER_PRESETS) {
+    throw new Error(`ユーザープリセットは最大${MAX_USER_PRESETS}件です。`);
+  }
+  const preset: UserPreset = {
+    id: 'u' + Date.now().toString(36),
+    label: label.slice(0, 40),
+    map: getEventMap(),
+  };
+  presets.push(preset);
+  await saveUserPresets(presets);
+  await cfg().update('preset', USER_PRESET_PREFIX + preset.id, vscode.ConfigurationTarget.Global);
+  return preset;
+}
+
+export async function deleteUserPreset(id: string): Promise<void> {
+  // 削除対象が選択中でも音が変わらないよう、先に現在の全割り当てを実体化して保存する
+  const currentKey = getPresetKey();
+  if (currentKey === USER_PRESET_PREFIX + id) {
+    await saveEventMap(getEventMap());
+    await cfg().update('preset', 'classicPc', vscode.ConfigurationTarget.Global);
+  }
+  await saveUserPresets(getUserPresets().filter((p) => p.id !== id));
 }
 
 function normalizeSoundRef(v: unknown): SoundRef | undefined {
@@ -80,9 +204,20 @@ function normalizeSoundRef(v: unknown): SoundRef | undefined {
   if (v.startsWith('preset:') && isValidRecipeId(v.slice(7))) { return v; }
   if (v.startsWith('slot:')) {
     const n = Number(v.slice(5));
-    if (Number.isInteger(n) && n >= 1 && n <= SLOT_COUNT) { return v; }
+    if (Number.isInteger(n) && n >= 1 && n <= MAX_SLOT_COUNT) { return v; }
   }
   return undefined;
+}
+
+/** 現在のプリセットキーに対応するデフォルトのイベント割り当て */
+function buildBaseEventMap(): EventMap {
+  const key = getPresetKey();
+  if (key.startsWith(USER_PRESET_PREFIX)) {
+    const id = key.slice(USER_PRESET_PREFIX.length);
+    const preset = getUserPresets().find((p) => p.id === id);
+    if (preset) { return preset.map; }
+  }
+  return buildEventMapFromPreset(key as PresetId);
 }
 
 /**
@@ -90,7 +225,7 @@ function normalizeSoundRef(v: unknown): SoundRef | undefined {
  * 保存済みのeventMapを現在のプリセットのデフォルトに重ねて全イベント分を返す。
  */
 export function getEventMap(): Record<EventId, EventSetting> {
-  const base = buildEventMapFromPreset(getPresetId());
+  const base = buildBaseEventMap();
   const stored = cfg().get<Record<string, unknown>>('eventMap', {});
   const result = {} as Record<EventId, EventSetting>;
   for (const eventId of ALL_EVENT_IDS) {
@@ -112,10 +247,23 @@ export async function saveEventMap(map: EventMap): Promise<void> {
   await cfg().update('eventMap', map, vscode.ConfigurationTarget.Global);
 }
 
-/** プリセットを一括適用する (preset設定 + eventMap上書き) */
-export async function applyPreset(presetId: PresetId): Promise<void> {
-  await cfg().update('preset', presetId, vscode.ConfigurationTarget.Global);
-  await saveEventMap(buildEventMapFromPreset(presetId));
+/**
+ * プリセットを一括適用する (preset設定 + eventMap上書き)。
+ * key は組み込みPresetId または 'user:<id>'。
+ */
+export async function applyPreset(key: string): Promise<void> {
+  let map: EventMap | undefined;
+  if (PRESET_MAP.has(key)) {
+    map = buildEventMapFromPreset(key as PresetId);
+  } else if (key.startsWith(USER_PRESET_PREFIX)) {
+    const id = key.slice(USER_PRESET_PREFIX.length);
+    map = getUserPresets().find((p) => p.id === id)?.map;
+  }
+  if (!map) {
+    throw new Error(`不明なプリセットです: ${key}`);
+  }
+  await cfg().update('preset', key, vscode.ConfigurationTarget.Global);
+  await saveEventMap(map);
 }
 
 export interface HostSettings {
@@ -183,7 +331,7 @@ export async function resetAllSettings(): Promise<void> {
     'typing.cooldownMs', 'typing.maxVoices',
     'notification.volume', 'diagnostics.cooldownMs',
     'lowLatencyMode', 'autoStartEngine', 'debugLog',
-    'eventMap', 'customSlots',
+    'eventMap', 'customSlots', 'userPresets',
   ];
   const c = cfg();
   for (const key of keys) {
@@ -197,7 +345,8 @@ export function exportSnapshot(): Record<string, unknown> {
   return {
     formatVersion: 1,
     exportedAt: new Date().toISOString(),
-    preset: getPresetId(),
+    preset: getPresetKey(),
+    userPresets: getUserPresets(),
     settings: {
       enabled: s.enabled,
       masterVolume: s.masterVolume,
@@ -227,7 +376,11 @@ export async function importSnapshot(data: unknown): Promise<void> {
     throw new Error('未対応のformatVersionです (対応: 1)。');
   }
   const c = cfg();
-  if (typeof o.preset === 'string' && PRESET_MAP.has(o.preset)) {
+  if (Array.isArray(o.userPresets)) {
+    await saveUserPresets(normalizeUserPresets(o.userPresets));
+  }
+  if (typeof o.preset === 'string'
+    && (PRESET_MAP.has(o.preset) || o.preset.startsWith(USER_PRESET_PREFIX))) {
     await c.update('preset', o.preset, vscode.ConfigurationTarget.Global);
   }
   const settings = (o.settings ?? {}) as Record<string, unknown>;
@@ -245,17 +398,6 @@ export async function importSnapshot(data: unknown): Promise<void> {
   }
   await saveSlots(normalizeSlots(o.customSlots));
   if (o.eventMap && typeof o.eventMap === 'object') {
-    const map: EventMap = {};
-    for (const eventId of ALL_EVENT_IDS) {
-      const raw = (o.eventMap as Record<string, unknown>)[eventId];
-      if (raw && typeof raw === 'object') {
-        const e = raw as { sound?: unknown; enabled?: unknown };
-        const sound = normalizeSoundRef(e.sound);
-        if (sound !== undefined) {
-          map[eventId] = { sound, enabled: e.enabled !== false };
-        }
-      }
-    }
-    await saveEventMap(map);
+    await saveEventMap(normalizeEventMap(o.eventMap));
   }
 }

@@ -3,12 +3,12 @@ import * as fs from 'fs/promises';
 import { AudioEngineHost } from './audioEngineHost';
 import { SoundService } from './soundService';
 import {
-  applyPreset, exportSnapshot, getSettings, getSlots, importSnapshot,
-  resetAllSettings, saveSlots,
+  applyPreset, exportSnapshot, getSettings, getSlots, getUserPresets,
+  importSnapshot, resetAllSettings, saveCurrentAsUserPreset, saveSlots,
 } from './config';
 import { PRESET_THEMES } from './presets';
 import { SOUND_RECIPES } from './soundRecipes';
-import { SUPPORTED_AUDIO_EXTENSIONS } from './types';
+import { SUPPORTED_AUDIO_EXTENSIONS, USER_PRESET_PREFIX } from './types';
 import { hasShellIntegrationApi } from './listeners';
 import { info, showLog } from './log';
 import * as path from 'path';
@@ -140,17 +140,43 @@ export function registerCommands(
   reg('popSe.openSettings', () => openSettingsPanel());
 
   reg('popSe.applyPreset', async () => {
-    const picked = await vscode.window.showQuickPick(
-      PRESET_THEMES.map((t) => ({
-        label: t.label,
-        description: t.description,
-        id: t.id,
-      })),
-      { title: 'プリセットテーマを一括適用', placeHolder: 'テーマを選択してください' }
-    );
-    if (picked) {
+    const items: Array<vscode.QuickPickItem & { id: string }> = PRESET_THEMES.map((t) => ({
+      label: t.label,
+      description: t.description,
+      id: t.id as string,
+    }));
+    const userPresets = getUserPresets();
+    if (userPresets.length > 0) {
+      items.push(
+        { label: 'マイプリセット', kind: vscode.QuickPickItemKind.Separator, id: '' },
+        ...userPresets.map((p) => ({
+          label: p.label,
+          description: '保存したプリセット',
+          id: USER_PRESET_PREFIX + p.id,
+        }))
+      );
+    }
+    const picked = await vscode.window.showQuickPick(items, {
+      title: 'プリセットテーマを一括適用', placeHolder: 'テーマを選択してください',
+    });
+    if (picked && picked.id) {
       await applyPreset(picked.id);
       void vscode.window.showInformationMessage(`Pop SE: プリセット「${picked.label}」を適用しました。`);
+    }
+  });
+
+  reg('popSe.saveUserPreset', async () => {
+    const label = await vscode.window.showInputBox({
+      title: '現在の設定をプリセットとして保存',
+      prompt: 'プリセット名を入力してください (40文字まで)',
+      validateInput: (v) => v.trim() ? undefined : '名前を入力してください',
+    });
+    if (!label) { return; }
+    try {
+      const preset = await saveCurrentAsUserPreset(label.trim());
+      void vscode.window.showInformationMessage(`Pop SE: プリセット「${preset.label}」を保存しました。`);
+    } catch (e) {
+      void vscode.window.showErrorMessage(`Pop SE: ${(e as Error).message}`);
     }
   });
 

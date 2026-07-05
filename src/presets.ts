@@ -36,6 +36,9 @@ export const PRESET_THEMES: PresetTheme[] = [
       taskStart: p('classic.taskstart'), taskSuccess: p('classic.success'), taskFailure: p('classic.fail'),
       terminalOpen: p('classic.termopen'), terminalClose: p('classic.termclose'),
       commandSuccess: p('classic.success'), commandFailure: p('classic.fail'),
+      aiClaudeStart: p('classic.taskstart'), aiClaudeEnd: p('classic.success'),
+      aiCodexStart: p('classic.taskstart'), aiCodexEnd: p('classic.success'),
+      aiCopilotStart: p('classic.taskstart'), aiCopilotEnd: p('classic.success'),
     },
   },
   {
@@ -53,6 +56,9 @@ export const PRESET_THEMES: PresetTheme[] = [
       taskStart: p('retro.start'), taskSuccess: p('retro.fanfare'), taskFailure: p('retro.gameover'),
       terminalOpen: p('retro.start'), terminalClose: p('retro.close'),
       commandSuccess: p('retro.powerup'), commandFailure: p('retro.gameover'),
+      aiClaudeStart: p('retro.start'), aiClaudeEnd: p('retro.fanfare'),
+      aiCodexStart: p('retro.start'), aiCodexEnd: p('retro.powerup'),
+      aiCopilotStart: p('retro.select'), aiCopilotEnd: p('retro.coin'),
     },
   },
   {
@@ -70,6 +76,9 @@ export const PRESET_THEMES: PresetTheme[] = [
       taskStart: p('mech.tap'), taskSuccess: p('mech.ok'), taskFailure: p('mech.ng'),
       terminalOpen: p('mech.tap'), terminalClose: p('mech.tap'),
       commandSuccess: p('mech.ok'), commandFailure: p('mech.ng'),
+      aiClaudeStart: p('mech.tap'), aiClaudeEnd: p('mech.ding'),
+      aiCodexStart: p('mech.tap'), aiCodexEnd: p('mech.ding'),
+      aiCopilotStart: p('mech.tap'), aiCopilotEnd: p('mech.ok'),
     },
   },
   {
@@ -87,6 +96,9 @@ export const PRESET_THEMES: PresetTheme[] = [
       taskStart: p('scifi.scan'), taskSuccess: p('scifi.success'), taskFailure: p('scifi.failure'),
       terminalOpen: p('scifi.open'), terminalClose: p('scifi.close2'),
       commandSuccess: p('scifi.success'), commandFailure: p('scifi.failure'),
+      aiClaudeStart: p('scifi.scan'), aiClaudeEnd: p('scifi.success'),
+      aiCodexStart: p('scifi.scan'), aiCodexEnd: p('scifi.success'),
+      aiCopilotStart: p('scifi.datain'), aiCopilotEnd: p('scifi.confirm'),
     },
   },
   {
@@ -104,6 +116,9 @@ export const PRESET_THEMES: PresetTheme[] = [
       taskStart: p('robot.boot'), taskSuccess: p('robot.ok'), taskFailure: p('robot.fail'),
       terminalOpen: p('robot.boot'), terminalClose: p('robot.off'),
       commandSuccess: p('robot.ok'), commandFailure: p('robot.fail'),
+      aiClaudeStart: p('robot.boot'), aiClaudeEnd: p('robot.ok'),
+      aiCodexStart: p('robot.boot'), aiCodexEnd: p('robot.ok'),
+      aiCopilotStart: p('robot.ack'), aiCopilotEnd: p('robot.ok'),
     },
   },
   {
@@ -120,6 +135,9 @@ export const PRESET_THEMES: PresetTheme[] = [
       taskStart: NONE, taskSuccess: p('min.ok'), taskFailure: p('min.fail'),
       terminalOpen: NONE, terminalClose: NONE,
       commandSuccess: p('min.tap'), commandFailure: p('min.fail'),
+      aiClaudeStart: NONE, aiClaudeEnd: p('min.ok'),
+      aiCodexStart: NONE, aiCodexEnd: p('min.ok'),
+      aiCopilotStart: NONE, aiCopilotEnd: p('min.tap'),
     },
   },
   {
@@ -136,6 +154,9 @@ export const PRESET_THEMES: PresetTheme[] = [
       taskStart: p('alert.notice'), taskSuccess: p('alert.success'), taskFailure: p('alert.fail'),
       terminalOpen: NONE, terminalClose: NONE,
       commandSuccess: p('alert.success'), commandFailure: p('alert.fail'),
+      aiClaudeStart: p('alert.notice'), aiClaudeEnd: p('alert.success'),
+      aiCodexStart: p('alert.notice'), aiCodexEnd: p('alert.success'),
+      aiCopilotStart: p('alert.notice'), aiCopilotEnd: p('alert.success'),
     },
   },
   {
@@ -149,6 +170,8 @@ export const PRESET_THEMES: PresetTheme[] = [
       errorAppear: NONE, warningAppear: NONE, errorResolve: NONE, warningResolve: NONE,
       taskStart: NONE, taskSuccess: NONE, taskFailure: NONE,
       terminalOpen: NONE, terminalClose: NONE, commandSuccess: NONE, commandFailure: NONE,
+      aiClaudeStart: NONE, aiClaudeEnd: NONE, aiCodexStart: NONE, aiCodexEnd: NONE,
+      aiCopilotStart: NONE, aiCopilotEnd: NONE,
     },
   },
 ];

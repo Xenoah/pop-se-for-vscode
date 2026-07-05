@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { SoundService } from './soundService';
+import { EventId } from './types';
 import { debug } from './log';
 
 /**
@@ -237,7 +238,7 @@ function registerTaskListeners(
 }
 
 // ============================================================
-// ターミナル (Shell Integration対応)
+// ターミナル (Shell Integration対応) + AIアシスタント検出
 // ============================================================
 
 /** Shell Integration API (VS Code 1.93+) が利用可能か */
@@ -246,29 +247,106 @@ export function hasShellIntegrationApi(): boolean {
     .onDidEndTerminalShellExecution === 'function';
 }
 
+type AiTool = 'claude' | 'codex' | 'copilot';
+
+const AI_START_EVENT: Record<AiTool, EventId> = {
+  claude: 'aiClaudeStart', codex: 'aiCodexStart', copilot: 'aiCopilotStart',
+};
+const AI_END_EVENT: Record<AiTool, EventId> = {
+  claude: 'aiClaudeEnd', codex: 'aiCodexEnd', copilot: 'aiCopilotEnd',
+};
+
+/**
+ * ターミナル名からAIアシスタントを判定する。
+ * Claude Code拡張は「Claude Code」という名前のターミナルでCLIを実行する。
+ * Codex / Copilot もCLI実行用ターミナル名にツール名が含まれることを利用する。
+ */
+function detectAiToolFromName(name: string): AiTool | undefined {
+  const n = name.toLowerCase();
+  if (n.includes('claude')) { return 'claude'; }
+  if (n.includes('codex')) { return 'codex'; }
+  if (n.includes('copilot')) { return 'copilot'; }
+  return undefined;
+}
+
+/**
+ * コマンドラインの先頭トークン (実行ファイル名) からAIアシスタントCLIを判定する。
+ * 注意: 判定に使うのは先頭トークンのみで、コマンドライン内容は保存もログ出力もしない。
+ */
+function detectAiToolFromCommandLine(commandLine: string | undefined): AiTool | undefined {
+  if (!commandLine) { return undefined; }
+  const first = commandLine.trim().split(/\s+/)[0] ?? '';
+  // パス・クォート・Windows拡張子を除いた実行ファイル名に正規化
+  const exe = first.replace(/^["']|["']$/g, '').split(/[\\/]/).pop()?.toLowerCase()
+    .replace(/\.(exe|cmd|ps1|bat)$/, '') ?? '';
+  if (exe === 'claude') { return 'claude'; }
+  if (exe === 'codex') { return 'codex'; }
+  if (exe === 'copilot' || exe === 'gh-copilot') { return 'copilot'; }
+  return undefined;
+}
+
 function registerTerminalListeners(
   context: vscode.ExtensionContext,
   sound: SoundService,
   warmingUp: () => boolean
 ): void {
   context.subscriptions.push(
-    vscode.window.onDidOpenTerminal(() => {
+    vscode.window.onDidOpenTerminal((terminal) => {
       if (warmingUp()) { return; } // ウィンドウ復元時のターミナルでは鳴らさない
-      sound.playEvent('terminalOpen');
+      // AIアシスタント用ターミナル (Claude Code拡張等) はAIイベントとして鳴らす
+      const tool = detectAiToolFromName(terminal.name);
+      if (tool) {
+        sound.playEvent(AI_START_EVENT[tool]);
+        debug(`ai terminal opened (${tool})`);
+      } else {
+        sound.playEvent('terminalOpen');
+      }
     })
   );
 
   context.subscriptions.push(
-    vscode.window.onDidCloseTerminal(() => {
-      sound.playEvent('terminalClose');
+    vscode.window.onDidCloseTerminal((terminal) => {
+      const tool = detectAiToolFromName(terminal.name);
+      if (tool) {
+        if (warmingUp()) { return; }
+        sound.playEvent(AI_END_EVENT[tool]);
+        debug(`ai terminal closed (${tool})`);
+      } else {
+        sound.playEvent('terminalClose');
+      }
     })
   );
 
   // コマンド成功/失敗はShell Integrationが有効な場合のみ判定できる。
   // 利用できない環境では対応外イベントとして無音。
   if (hasShellIntegrationApi()) {
+    // 通常ターミナル内でAI CLI (claude / codex / copilot) を実行したケースの検出。
+    // 開始時にAI開始イベント、終了時にAI終了イベントを鳴らし、汎用の
+    // コマンド成功/失敗とは二重に鳴らさない。
+    const aiExecutions = new WeakMap<vscode.TerminalShellExecution, AiTool>();
+
+    if (typeof vscode.window.onDidStartTerminalShellExecution === 'function') {
+      context.subscriptions.push(
+        vscode.window.onDidStartTerminalShellExecution((e) => {
+          const tool = detectAiToolFromCommandLine(e.execution.commandLine?.value);
+          if (tool) {
+            aiExecutions.set(e.execution, tool);
+            sound.playEvent(AI_START_EVENT[tool]);
+            debug(`ai cli started (${tool})`);
+          }
+        })
+      );
+    }
+
     context.subscriptions.push(
       vscode.window.onDidEndTerminalShellExecution((e) => {
+        const tool = aiExecutions.get(e.execution)
+          ?? detectAiToolFromCommandLine(e.execution.commandLine?.value);
+        if (tool) {
+          sound.playEvent(AI_END_EVENT[tool]);
+          debug(`ai cli ended (${tool}, exitCode=${e.exitCode ?? 'n/a'})`);
+          return;
+        }
         if (e.exitCode === undefined) { return; } // 判定不能 (Ctrl+C等) は無音
         if (e.exitCode === 0) {
           sound.playEvent('commandSuccess');

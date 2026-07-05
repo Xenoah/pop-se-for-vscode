@@ -1,7 +1,7 @@
 {
   "name": "pop-se",
   "displayName": "Pop SE - Sound Theme Engine",
-  "description": "VS Code Sound Theme Engine: play sound effects on typing, save, terminal, build, and diagnostics events. Preset themes + 10 custom sound slots.",
+  "description": "VS Code Sound Theme Engine: play sound effects on typing, save, terminal, build, diagnostics, and AI assistant (Claude Code / Codex / Copilot) events. Preset themes + up to 100 custom sound slots.",
   "version": "0.1.0",
   "publisher": "xenoah",
   "private": true,
@@ -68,6 +68,11 @@
         "category": "Pop SE"
       },
       {
+        "command": "popSe.saveUserPreset",
+        "title": "現在の設定をプリセットとして保存 (Save Current as Preset)",
+        "category": "Pop SE"
+      },
+      {
         "command": "popSe.pickCustomSoundFile",
         "title": "カスタム音スロットに音声ファイルを割り当て (Pick Custom Sound File)",
         "category": "Pop SE"
@@ -121,27 +126,15 @@
         "popSe.preset": {
           "type": "string",
           "default": "classicPc",
-          "enum": [
-            "classicPc",
-            "retroGame",
-            "mechanicalKeyboard",
-            "sciFiConsole",
-            "robotTerminal",
-            "minimalUi",
-            "alertHeavy",
-            "silentAssistant"
-          ],
-          "enumDescriptions": [
-            "Classic PC — 昔のPCスピーカー風ビープ音",
-            "Retro Game — 8bitゲーム機風",
-            "Mechanical Keyboard — メカニカルキーボードの打鍵音",
-            "Sci-Fi Console — SF風コンソール音",
-            "Robot Terminal — ロボット/ローファイ端末風",
-            "Minimal UI — ごく控えめな通知音のみ",
-            "Alert Heavy — タイプ音なし・通知音強め",
-            "Silent Assistant — すべて無音"
-          ],
-          "description": "現在のプリセットテーマ。変更するとイベント割り当てが一括適用されます。"
+          "markdownDescription": "現在のプリセットテーマ。組み込み: `classicPc` / `retroGame` / `mechanicalKeyboard` / `sciFiConsole` / `robotTerminal` / `minimalUi` / `alertHeavy` / `silentAssistant`。保存したマイプリセットは `user:<id>` 形式です。通常は設定画面またはコマンド (`Pop SE: プリセットテーマを適用`) から変更してください。"
+        },
+        "popSe.userPresets": {
+          "type": "array",
+          "default": [],
+          "markdownDescription": "保存したマイプリセット (最大30件)。通常は設定画面の「現在の設定をプリセットとして保存」から編集してください。",
+          "items": {
+            "type": "object"
+          }
         },
         "popSe.typing.enabled": {
           "type": "boolean",
@@ -212,7 +205,7 @@
         "popSe.customSlots": {
           "type": "array",
           "default": [],
-          "markdownDescription": "カスタム音スロット (固定10枠)。通常は設定画面から編集してください。",
+          "markdownDescription": "カスタム音スロット (初期10枠、最大100枠)。通常は設定画面から編集してください。",
           "items": {
             "type": "object"
           }

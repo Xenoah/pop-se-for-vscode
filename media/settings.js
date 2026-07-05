@@ -74,23 +74,45 @@
   }
 
   // ---------- Preset ----------
+  function presetCard(p, extraButtons) {
+    const isCurrent = p.id === state.currentPreset;
+    return h('div', { class: 'preset-card' + (isCurrent ? ' current' : '') },
+      h('h3', {}, p.label, isCurrent ? h('span', { class: 'badge', text: '適用中' }) : null),
+      h('p', { text: p.description || '' }),
+      h('button', {
+        class: 'action',
+        onclick: () => send({ cmd: 'applyPreset', presetId: p.id }),
+      }, 'このテーマを一括適用'),
+      ...(extraButtons || [])
+    );
+  }
+
   function renderPreset(root) {
+    const userCards = state.userPresets.map((p) =>
+      presetCard(
+        { id: p.id, label: p.label, description: '保存したプリセット' },
+        [h('button', {
+          class: 'action secondary', style: 'margin-left:6px',
+          onclick: () => send({ cmd: 'deleteUserPreset', presetId: p.id }),
+        }, '削除…')]
+      )
+    );
+
     root.replaceChildren(
       h('h2', { text: 'プリセットテーマ' }),
       h('div', { class: 'desc', text: 'テーマを選んで「一括適用」を押すと、全イベントの音割り当てがまとめて置き換わります。個別の割り当ては Event Mapping で調整できます。' }),
-      h('div', { class: 'preset-grid' },
-        ...state.presets.map((p) => {
-          const isCurrent = state.settings ? p.id === state.currentPreset : false;
-          return h('div', { class: 'preset-card' + (isCurrent ? ' current' : '') },
-            h('h3', {}, p.label, isCurrent ? h('span', { class: 'badge', text: '適用中' }) : null),
-            h('p', { text: p.description }),
-            h('button', {
-              class: 'action',
-              onclick: () => send({ cmd: 'applyPreset', presetId: p.id }),
-            }, 'このテーマを一括適用')
-          );
-        })
-      )
+      h('div', { class: 'preset-grid' }, ...state.presets.map((p) => presetCard(p))),
+      h('h2', { text: 'マイプリセット', style: 'margin-top:24px' }),
+      h('div', { class: 'desc', text: `現在のイベント割り当てを名前を付けて保存できます (最大${state.maxUserPresets}件)。Event Mappingで調整した内容をそのままプリセット化できます。` }),
+      h('div', { class: 'io-zone' },
+        h('button', {
+          class: 'action',
+          onclick: () => send({ cmd: 'saveUserPreset' }),
+        }, '現在の設定をプリセットとして保存…')
+      ),
+      userCards.length
+        ? h('div', { class: 'preset-grid' }, ...userCards)
+        : h('div', { class: 'hint', text: '保存済みのマイプリセットはまだありません。' })
     );
   }
 
@@ -179,10 +201,29 @@
       );
     });
 
+    const slotButtons = () => {
+      const buttons = [];
+      if (state.slots.length < state.maxSlots) {
+        buttons.push(h('button', {
+          class: 'action',
+          onclick: () => send({ cmd: 'addSlot' }),
+        }, `＋ スロットを追加 (${state.slots.length} / ${state.maxSlots})`));
+      }
+      if (state.slots.length > state.minSlots) {
+        buttons.push(h('button', {
+          class: 'action secondary', style: 'margin-left:6px',
+          onclick: () => send({ cmd: 'removeSlot' }),
+        }, `− 末尾のスロット #${state.slots.length} を削除`));
+      }
+      return h('div', { class: 'io-zone' }, ...buttons);
+    };
+
     root.replaceChildren(
-      h('h2', { text: 'カスタム音スロット (10枠)' }),
+      h('h2', { text: `カスタム音スロット (${state.slots.length}枠 / 最大${state.maxSlots}枠)` }),
       h('div', { class: 'desc', text: '任意の音声ファイル (wav / mp3 / ogg / m4a) または生成音を登録できます。登録した音は Event Mapping で任意のイベントに割り当てられます。ファイルは起動時と設定時にプリロードされ、イベント発生時の読み込みはありません。' }),
-      ...cards
+      slotButtons(),
+      ...cards,
+      slotButtons()
     );
   }
 
@@ -190,6 +231,7 @@
   const CATEGORY_LABEL = {
     typing: 'タイプ音', editor: 'エディタ操作', diagnostics: 'Diagnostics',
     task: 'タスク / ビルド', terminal: 'ターミナル',
+    ai: 'AIアシスタント (Claude Code / Codex / Copilot)',
   };
 
   function renderMapping(root) {
@@ -223,6 +265,9 @@
       }
       if (category === 'diagnostics') {
         notes.push(h('div', { class: 'hint', text: 'エラー/警告は「0件→発生」「発生→0件」の遷移時のみ鳴ります。連続発火はAdvancedのcooldownで抑制されます。' }));
+      }
+      if (category === 'ai') {
+        notes.push(h('div', { class: 'hint', text: 'ツール名を含むターミナルの作成/終了、および claude / codex / copilot コマンドの実行開始/終了で鳴ります (Shell Integration対応シェルのみ)。Copilotのインライン補完・チャットはVS Code APIで検出できないため対象外です。' }));
       }
       groupEls.push(
         h('div', { class: 'event-group' },
@@ -307,10 +352,10 @@
         h('button', { class: 'action secondary', onclick: () => send({ cmd: 'export' }) }, '設定をエクスポート…'),
         h('button', { class: 'action secondary', onclick: () => send({ cmd: 'import' }) }, '設定をインポート…')
       ),
-      h('div', { class: 'hint', text: 'エクスポートにはプリセット・イベント割り当て・カスタム音10枠・音量・高度な設定が含まれます。' }),
+      h('div', { class: 'hint', text: 'エクスポートにはプリセット・マイプリセット・イベント割り当て・カスタム音スロット・音量・高度な設定が含まれます。' }),
       h('div', { class: 'danger-zone' },
         h('h3', { text: 'オールリセット' }),
-        h('p', { class: 'hint', text: 'プリセット設定 / イベント割り当て / カスタム音10枠 / 音量設定 / cooldown設定 / 高度な設定 をすべて初期状態に戻します。実行前に確認ダイアログが表示されます。' }),
+        h('p', { class: 'hint', text: 'プリセット設定 / マイプリセット / イベント割り当て / カスタム音スロット / 音量設定 / cooldown設定 / 高度な設定 をすべて初期状態に戻します。実行前に確認ダイアログが表示されます。' }),
         h('button', { class: 'action danger', onclick: () => send({ cmd: 'resetAll' }) }, 'すべて初期化…')
       )
     );

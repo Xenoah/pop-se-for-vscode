@@ -32,7 +32,14 @@ export type EventId =
   | 'terminalOpen'
   | 'terminalClose'
   | 'commandSuccess'
-  | 'commandFailure';
+  | 'commandFailure'
+  // AIアシスタント (Claude Code / Codex / GitHub Copilot)
+  | 'aiClaudeStart'
+  | 'aiClaudeEnd'
+  | 'aiCodexStart'
+  | 'aiCodexEnd'
+  | 'aiCopilotStart'
+  | 'aiCopilotEnd';
 
 export const ALL_EVENT_IDS: EventId[] = [
   'keyClick', 'enter', 'backspace', 'delete', 'space', 'tab', 'paste', 'undo', 'redo',
@@ -40,9 +47,11 @@ export const ALL_EVENT_IDS: EventId[] = [
   'errorAppear', 'warningAppear', 'errorResolve', 'warningResolve',
   'taskStart', 'taskSuccess', 'taskFailure',
   'terminalOpen', 'terminalClose', 'commandSuccess', 'commandFailure',
+  'aiClaudeStart', 'aiClaudeEnd', 'aiCodexStart', 'aiCodexEnd',
+  'aiCopilotStart', 'aiCopilotEnd',
 ];
 
-export type EventCategory = 'typing' | 'editor' | 'diagnostics' | 'task' | 'terminal';
+export type EventCategory = 'typing' | 'editor' | 'diagnostics' | 'task' | 'terminal' | 'ai';
 
 export const EVENT_CATEGORY: Record<EventId, EventCategory> = {
   keyClick: 'typing', enter: 'typing', backspace: 'typing', delete: 'typing',
@@ -53,6 +62,9 @@ export const EVENT_CATEGORY: Record<EventId, EventCategory> = {
   taskStart: 'task', taskSuccess: 'task', taskFailure: 'task',
   terminalOpen: 'terminal', terminalClose: 'terminal',
   commandSuccess: 'terminal', commandFailure: 'terminal',
+  aiClaudeStart: 'ai', aiClaudeEnd: 'ai',
+  aiCodexStart: 'ai', aiCodexEnd: 'ai',
+  aiCopilotStart: 'ai', aiCopilotEnd: 'ai',
 };
 
 export const EVENT_LABEL_JA: Record<EventId, string> = {
@@ -65,6 +77,9 @@ export const EVENT_LABEL_JA: Record<EventId, string> = {
   taskStart: 'タスク開始', taskSuccess: 'タスク終了成功', taskFailure: 'タスク終了失敗',
   terminalOpen: 'ターミナル作成', terminalClose: 'ターミナル終了',
   commandSuccess: 'コマンド成功', commandFailure: 'コマンド失敗',
+  aiClaudeStart: 'Claude Code 開始', aiClaudeEnd: 'Claude Code 終了',
+  aiCodexStart: 'Codex 開始', aiCodexEnd: 'Codex 終了',
+  aiCopilotStart: 'GitHub Copilot 開始', aiCopilotEnd: 'GitHub Copilot 終了',
 };
 
 /**
@@ -84,9 +99,9 @@ export type EventMap = Partial<Record<EventId, EventSetting>>;
 
 export type SlotType = 'none' | 'file' | 'generated';
 
-/** カスタム音スロット (固定10枠) */
+/** カスタム音スロット (初期10枠、最大100枠まで追加可能) */
 export interface CustomSlot {
-  id: number;            // 1..10
+  id: number;            // 1..MAX_SLOT_COUNT (連番)
   name: string;
   enabled: boolean;
   type: SlotType;
@@ -97,7 +112,19 @@ export interface CustomSlot {
   description: string;
 }
 
-export const SLOT_COUNT = 10;
+export const MIN_SLOT_COUNT = 10;
+export const MAX_SLOT_COUNT = 100;
+
+/** ユーザーが保存したプリセット (現在のイベント割り当てのスナップショット) */
+export interface UserPreset {
+  id: string;            // 'u' + タイムスタンプ36進
+  label: string;
+  map: EventMap;
+}
+
+export const MAX_USER_PRESETS = 30;
+/** popSe.preset に保存するユーザープリセット参照のプレフィックス */
+export const USER_PRESET_PREFIX = 'user:';
 export const SUPPORTED_AUDIO_EXTENSIONS = ['wav', 'mp3', 'ogg', 'm4a'];
 
 /** 生成音レシピの1レイヤー (オシレータまたはノイズ) */
@@ -171,4 +198,6 @@ export type EngineToHostMessage =
     }
   | { type: 'decoded'; slotId: number; durationSec: number }
   | { type: 'decodeError'; slotId: number; message: string }
+  /** 自動再生制限でAudioContextを開始できないとき (要ユーザー操作) */
+  | { type: 'audioBlocked' }
   | { type: 'log'; message: string };
