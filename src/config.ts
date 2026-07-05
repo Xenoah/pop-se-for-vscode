@@ -279,6 +279,7 @@ export interface HostSettings {
   diagnosticsCooldownMs: number;
   lowLatencyMode: boolean;
   autoStartEngine: boolean;
+  externalTriggersEnabled: boolean;
   debugLog: boolean;
 }
 
@@ -297,6 +298,7 @@ export function getSettings(): HostSettings {
     diagnosticsCooldownMs: Math.max(0, c.get('diagnostics.cooldownMs', 1500)),
     lowLatencyMode: c.get('lowLatencyMode', true),
     autoStartEngine: c.get('autoStartEngine', true),
+    externalTriggersEnabled: c.get('externalTriggers.enabled', true),
     debugLog: c.get('debugLog', false),
   };
 }
@@ -330,7 +332,7 @@ export async function resetAllSettings(): Promise<void> {
     'typing.enabled', 'typing.volume', 'typing.pitchRandomization',
     'typing.cooldownMs', 'typing.maxVoices',
     'notification.volume', 'diagnostics.cooldownMs',
-    'lowLatencyMode', 'autoStartEngine', 'debugLog',
+    'lowLatencyMode', 'autoStartEngine', 'externalTriggers.enabled', 'debugLog',
     'eventMap', 'customSlots', 'userPresets',
   ];
   const c = cfg();
@@ -359,6 +361,7 @@ export function exportSnapshot(): Record<string, unknown> {
       'diagnostics.cooldownMs': s.diagnosticsCooldownMs,
       lowLatencyMode: s.lowLatencyMode,
       autoStartEngine: s.autoStartEngine,
+      'externalTriggers.enabled': s.externalTriggersEnabled,
       debugLog: s.debugLog,
     },
     eventMap: getEventMap(),
@@ -384,7 +387,7 @@ export async function importSnapshot(data: unknown): Promise<void> {
     await c.update('preset', o.preset, vscode.ConfigurationTarget.Global);
   }
   const settings = (o.settings ?? {}) as Record<string, unknown>;
-  const boolKeys = ['enabled', 'typing.enabled', 'typing.pitchRandomization', 'lowLatencyMode', 'autoStartEngine', 'debugLog'];
+  const boolKeys = ['enabled', 'typing.enabled', 'typing.pitchRandomization', 'lowLatencyMode', 'autoStartEngine', 'externalTriggers.enabled', 'debugLog'];
   const numKeys = ['masterVolume', 'typing.volume', 'typing.cooldownMs', 'typing.maxVoices', 'notification.volume', 'diagnostics.cooldownMs'];
   for (const key of boolKeys) {
     if (typeof settings[key] === 'boolean') {

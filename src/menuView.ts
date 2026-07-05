@@ -90,6 +90,12 @@ export class MenuViewProvider implements vscode.TreeDataProvider<MenuEntry> {
         commandId: 'popSe.diagnose',
       },
       {
+        label: 'AI連携フックの設定例',
+        icon: 'plug',
+        commandId: 'popSe.setupAiHooks',
+        tooltip: 'Claude Code hooks / Codex notify から音を鳴らす設定例を表示',
+      },
+      {
         label: '設定をエクスポート',
         icon: 'export',
         commandId: 'popSe.exportSettings',

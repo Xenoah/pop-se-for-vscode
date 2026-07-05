@@ -38,6 +38,7 @@
   const stateEl = document.getElementById('ctx-state');
   const cachedEl = document.getElementById('cached');
   const unlockBtn = document.getElementById('unlock');
+  const testBtn = document.getElementById('testtone');
 
   function log(message) {
     vscode.postMessage({ type: 'log', message: String(message) });
@@ -136,6 +137,40 @@
       ensureContext();
       tryResume();
     });
+  }
+
+  /**
+   * 診断用テスト音。設定 (音量/イベント割り当て/enabled) を介さず、
+   * AudioContextのdestinationへ直接880Hzのビープを鳴らす。
+   * これが聞こえない場合はOSの音量ミキサー/出力デバイス側の問題。
+   */
+  function playTestTone() {
+    ensureContext();
+    const emit = () => {
+      const t = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, t);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.25, t + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.35);
+      osc.connect(g);
+      g.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.4);
+      log('test tone played (state=' + ctx.state + ')');
+    };
+    if (ctx.state === 'running') {
+      emit();
+    } else {
+      // resumeが成功した時点で鳴らす (ボタンクリック経由ならジェスチャーで必ず成功する)
+      ctx.resume().then(emit).catch(() => log('test tone: resume failed'));
+    }
+  }
+
+  if (testBtn) {
+    testBtn.addEventListener('click', playTestTone);
   }
 
   function createNoiseBuffer(audioCtx) {
@@ -447,6 +482,9 @@
         break;
       case 'stopAll':
         stopAll();
+        break;
+      case 'testTone':
+        playTestTone();
         break;
       case 'ping':
         ensureContext();

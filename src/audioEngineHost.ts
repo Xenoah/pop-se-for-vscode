@@ -186,10 +186,23 @@ export class AudioEngineHost implements vscode.WebviewViewProvider {
     }
   }
 
+  /** イベント発生時の起動再試行の管理 (無限リトライを避けつつ自己回復させる) */
+  private startRetryCount = 0;
+  private lastStartRetryAt = 0;
+
   /** 再生指示。エンジン未起動なら起動を試み、その回の音はスキップする (低遅延優先)。 */
   play(sound: SoundRef, channel: AudioChannel, opts?: { pitchRand?: boolean; typing?: boolean }): void {
     if (!this.engineReady) {
-      void this.ensureStarted(false);
+      // 初回はフラグ制御のensureStartedに任せ、それでも起動していなければ
+      // 5秒間隔で最大5回まで強制再試行する (起動失敗からの自己回復)
+      const now = Date.now();
+      if (!this.startAttempted) {
+        void this.ensureStarted(false);
+      } else if (this.startRetryCount < 5 && now - this.lastStartRetryAt > 5000) {
+        this.startRetryCount++;
+        this.lastStartRetryAt = now;
+        void this.ensureStarted(true);
+      }
       return;
     }
     this.post({
@@ -200,6 +213,11 @@ export class AudioEngineHost implements vscode.WebviewViewProvider {
 
   stopAll(): void {
     this.post({ type: 'stopAll' });
+  }
+
+  /** 診断用: 設定を介さないテスト音をエンジンへ送る */
+  playTestTone(): void {
+    this.post({ type: 'testTone' });
   }
 
   isRunning(): boolean {
@@ -272,9 +290,14 @@ export class AudioEngineHost implements vscode.WebviewViewProvider {
     <button id="unlock" style="display:none; margin-left:8px; cursor:pointer;
       background: var(--vscode-button-background); color: var(--vscode-button-foreground);
       border: none; border-radius: 3px; padding: 2px 10px; font-size: 12px;">🔊 音声を有効化</button>
+    <button id="testtone" style="margin-left:8px; cursor:pointer;
+      background: var(--vscode-button-secondaryBackground, #3a3d41);
+      color: var(--vscode-button-secondaryForeground, #ffffff);
+      border: none; border-radius: 3px; padding: 2px 10px; font-size: 12px;">🔔 テスト音</button>
   </div>
   <div class="row">キャッシュ済みカスタム音: <span id="cached">0</span></div>
   <div class="row" style="opacity:0.6">このビューは音声再生エンジンです。閉じると音が鳴らなくなります。</div>
+  <div class="row" style="opacity:0.6">音が出ないときは「🔔 テスト音」を押してください。それでも聞こえない場合はOSの音量ミキサーでVS Codeがミュートされていないか確認してください。</div>
   <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;

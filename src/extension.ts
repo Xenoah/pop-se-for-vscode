@@ -5,6 +5,7 @@ import { registerAllListeners } from './listeners';
 import { registerCommands } from './commands';
 import { SettingsPanel } from './settingsPanel';
 import { MenuViewProvider, MENU_VIEW_ID } from './menuView';
+import { TriggerBridge } from './triggerBridge';
 import { getSettings } from './config';
 import { debug, initLog, setDebugEnabled } from './log';
 
@@ -25,6 +26,14 @@ export function activate(context: vscode.ExtensionContext): void {
   );
 
   const sound = new SoundService(engine);
+
+  // 外部トリガーブリッジ (~/.pop-se/events/ の監視)。
+  // Claude Code hooks / Codex notify 等からAIフェーズイベントを鳴らす入口。
+  const bridge = new TriggerBridge(sound);
+  context.subscriptions.push(bridge);
+  if (getSettings().externalTriggersEnabled) {
+    bridge.start();
+  }
 
   // アクティビティバー (左側) のメニュー
   const menu = new MenuViewProvider(engine);
@@ -58,6 +67,7 @@ export function activate(context: vscode.ExtensionContext): void {
       sound.refresh();
       SettingsPanel.refreshIfOpen();
       menu.refresh();
+      if (s.externalTriggersEnabled) { bridge.start(); } else { bridge.stop(); }
       // 無効→有効に戻したときはエンジンビューを再初期化する
       // (無効化中はwhen句によりビューごと破棄されているため)
       if (e.affectsConfiguration('popSe.enabled') && s.enabled && engine && !engine.isRunning()) {

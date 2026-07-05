@@ -39,7 +39,15 @@ export type EventId =
   | 'aiCodexStart'
   | 'aiCodexEnd'
   | 'aiCopilotStart'
-  | 'aiCopilotEnd';
+  | 'aiCopilotEnd'
+  // AIアシスタント フェーズ (外部トリガー: Claude Code hooks / Codex notify 等から発火)
+  | 'aiPromptSend'
+  | 'aiOutput'
+  | 'aiConfirm'
+  | 'aiSelect'
+  | 'aiApprove'
+  | 'aiApproveDone'
+  | 'aiComplete';
 
 export const ALL_EVENT_IDS: EventId[] = [
   'keyClick', 'enter', 'backspace', 'delete', 'space', 'tab', 'paste', 'undo', 'redo',
@@ -49,6 +57,8 @@ export const ALL_EVENT_IDS: EventId[] = [
   'terminalOpen', 'terminalClose', 'commandSuccess', 'commandFailure',
   'aiClaudeStart', 'aiClaudeEnd', 'aiCodexStart', 'aiCodexEnd',
   'aiCopilotStart', 'aiCopilotEnd',
+  'aiPromptSend', 'aiOutput', 'aiConfirm', 'aiSelect', 'aiApprove',
+  'aiApproveDone', 'aiComplete',
 ];
 
 export type EventCategory = 'typing' | 'editor' | 'diagnostics' | 'task' | 'terminal' | 'ai';
@@ -65,6 +75,8 @@ export const EVENT_CATEGORY: Record<EventId, EventCategory> = {
   aiClaudeStart: 'ai', aiClaudeEnd: 'ai',
   aiCodexStart: 'ai', aiCodexEnd: 'ai',
   aiCopilotStart: 'ai', aiCopilotEnd: 'ai',
+  aiPromptSend: 'ai', aiOutput: 'ai', aiConfirm: 'ai',
+  aiSelect: 'ai', aiApprove: 'ai', aiApproveDone: 'ai', aiComplete: 'ai',
 };
 
 export const EVENT_LABEL_JA: Record<EventId, string> = {
@@ -80,6 +92,10 @@ export const EVENT_LABEL_JA: Record<EventId, string> = {
   aiClaudeStart: 'Claude Code 開始', aiClaudeEnd: 'Claude Code 終了',
   aiCodexStart: 'Codex 開始', aiCodexEnd: 'Codex 終了',
   aiCopilotStart: 'GitHub Copilot 開始', aiCopilotEnd: 'GitHub Copilot 終了',
+  aiPromptSend: 'AI: プロンプト送信', aiOutput: 'AI: 応答出力中',
+  aiConfirm: 'AI: 確認要求', aiSelect: 'AI: 選択要求',
+  aiApprove: 'AI: 承認要求', aiApproveDone: 'AI: 承認完了 (ツール実行開始)',
+  aiComplete: 'AI: 作業完了',
 };
 
 /**
@@ -183,6 +199,8 @@ export type HostToEngineMessage =
       typing?: boolean;
     }
   | { type: 'stopAll' }
+  /** 診断用テスト音。設定・イベント割り当てを介さず直接ビープを鳴らす */
+  | { type: 'testTone' }
   | { type: 'ping' };
 
 // ---- Audio Engine Webview -> Extension Host ----

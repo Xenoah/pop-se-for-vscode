@@ -98,6 +98,11 @@
         "category": "Pop SE"
       },
       {
+        "command": "popSe.setupAiHooks",
+        "title": "AI連携フックの設定例を表示 (Show AI Hook Examples)",
+        "category": "Pop SE"
+      },
+      {
         "command": "popSe.exportSettings",
         "title": "設定をエクスポート (Export Settings)",
         "category": "Pop SE"
@@ -185,6 +190,11 @@
           "type": "boolean",
           "default": true,
           "description": "低遅延モード。AudioContextをinteractive設定で常時稼働させ、タイプ音の遅延を最小化します。"
+        },
+        "popSe.externalTriggers.enabled": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "外部トリガーブリッジの有効/無効。`~/.pop-se/events/<eventId>` ファイルの作成/更新を監視し、Claude Code hooks / Codex notify などの外部ツールから音を鳴らせます (ファイル名のみ使用、内容は読み取りません)。設定例はコマンド `Pop SE: AI連携フックの設定例を表示` を参照。"
         },
         "popSe.autoStartEngine": {
           "type": "boolean",

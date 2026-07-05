@@ -267,7 +267,9 @@
         notes.push(h('div', { class: 'hint', text: 'エラー/警告は「0件→発生」「発生→0件」の遷移時のみ鳴ります。連続発火はAdvancedのcooldownで抑制されます。' }));
       }
       if (category === 'ai') {
-        notes.push(h('div', { class: 'hint', text: 'ツール名を含むターミナルの作成/終了、および claude / codex / copilot コマンドの実行開始/終了で鳴ります (Shell Integration対応シェルのみ)。Copilotのインライン補完・チャットはVS Code APIで検出できないため対象外です。' }));
+        notes.push(h('div', { class: 'hint', text: '「開始/終了」はツール名を含むターミナルの作成/終了、および claude / codex / copilot コマンドの実行開始/終了で鳴ります (Shell Integration対応シェルのみ)。' }));
+        notes.push(h('div', { class: 'hint', text: '「AI: 応答出力中」はチャット応答のコードブロックのストリーム、およびAIエージェントによる非アクティブファイルの編集で自動的に鳴ります。' }));
+        notes.push(h('div', { class: 'hint', text: '「送信/確認/選択/承認要求/承認完了/作業完了」は外部トリガー (Claude Code hooks / Codex notify 等) から鳴らします。設定例はコマンド「Pop SE: AI連携フックの設定例を表示」を参照してください。Copilotチャットの本文テキストはVS Code APIで検出できません (コードブロックのみ検出可)。' }));
       }
       groupEls.push(
         h('div', { class: 'event-group' },

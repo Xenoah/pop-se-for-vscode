@@ -24,6 +24,7 @@ export function registerAllListeners(
   registerDiagnosticsListener(context, sound, warmingUp);
   registerTaskListeners(context, sound);
   registerTerminalListeners(context, sound, warmingUp);
+  registerAiOutputListener(context, sound, warmingUp);
 }
 
 // ============================================================
@@ -233,6 +234,56 @@ function registerTaskListeners(
           sound.playEvent('taskSuccess');
         }
       }, 150);
+    })
+  );
+}
+
+// ============================================================
+// AI応答出力の検出 (aiOutput)
+// ============================================================
+
+/**
+ * AIアシスタントが「文字を出している」ことをドキュメント変更から検出する。
+ * 検出対象:
+ *  1. チャット系の仮想ドキュメント — Copilot Chat等が応答内のコードブロックを
+ *     ストリームする際に 'vscode-chat-code-block' などのスキームで
+ *     onDidChangeTextDocumentが発火する
+ *  2. アクティブエディタ以外のファイルへの変更 — エージェント (Copilot Edits /
+ *     Claude Code / Codex) が編集中のファイルをストリーム更新すると発火する。
+ *     ユーザーのタイプはアクティブエディタで起きるため干渉しない
+ * 注意: 2はgit操作・一括置換などでも発火しうるヒューリスティック。
+ * 音はaiOutputイベントに割り当てられたもので、無音にすれば無効化できる。
+ * ここでもドキュメント内容は一切読まない (スキームと変更の有無のみ)。
+ */
+function registerAiOutputListener(
+  context: vscode.ExtensionContext,
+  sound: SoundService,
+  warmingUp: () => boolean
+): void {
+  let lastOutputAt = 0;
+  const THROTTLE_MS = 250; // ストリーミング中の連続発火をカタカタ音程度に間引く
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeTextDocument((e) => {
+      if (e.contentChanges.length === 0 || warmingUp()) { return; }
+      const scheme = e.document.uri.scheme;
+
+      // チャット応答の仮想ドキュメント (Copilot Chat / Codex等)
+      const isChatDoc = scheme.includes('chat') || scheme.includes('copilot') || scheme.includes('codex');
+
+      if (!isChatDoc) {
+        if (scheme !== 'file') { return; } // output等の内部スキームは対象外
+        const active = vscode.window.activeTextEditor;
+        // アクティブエディタへの変更はユーザーのタイプ音側で処理される
+        if (active && active.document === e.document) { return; }
+        // 削除のみの変更 (git checkout等で頻発) は対象外にし、挿入を伴うものだけ拾う
+        if (!e.contentChanges.some((c) => c.text.length > 0)) { return; }
+      }
+
+      const now = Date.now();
+      if (now - lastOutputAt < THROTTLE_MS) { return; }
+      lastOutputAt = now;
+      sound.playEvent('aiOutput');
     })
   );
 }
