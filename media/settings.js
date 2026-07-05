@@ -268,7 +268,7 @@
       }
       if (category === 'ai') {
         notes.push(h('div', { class: 'hint', text: '「開始/終了」はツール名を含むターミナルの作成/終了、および claude / codex / copilot コマンドの実行開始/終了で鳴ります (Shell Integration対応シェルのみ)。' }));
-        notes.push(h('div', { class: 'hint', text: '「AI: 応答出力中」はチャット応答のコードブロックのストリーム、およびAIエージェントによる非アクティブファイルの編集で自動的に鳴ります。' }));
+        notes.push(h('div', { class: 'hint', text: '「AI: 応答出力中」は自動検出です: チャット応答のコードブロックのストリーム / AIエージェントによる非アクティブエディタの編集 / ワークスペースのファイル変更 (Codex拡張・Claude Code拡張などのディスク直接書き込み。ユーザー自身の保存では鳴りません)。' }));
         notes.push(h('div', { class: 'hint', text: '「送信/確認/選択/承認要求/承認完了/作業完了」は外部トリガー (Claude Code hooks / Codex notify 等) から鳴らします。設定例はコマンド「Pop SE: AI連携フックの設定例を表示」を参照してください。Copilotチャットの本文テキストはVS Code APIで検出できません (コードブロックのみ検出可)。' }));
       }
       groupEls.push(

@@ -25,6 +25,7 @@ export function registerAllListeners(
   registerTaskListeners(context, sound);
   registerTerminalListeners(context, sound, warmingUp);
   registerAiOutputListener(context, sound, warmingUp);
+  registerAiFileActivityListener(context, sound, warmingUp);
 }
 
 // ============================================================
@@ -286,6 +287,55 @@ function registerAiOutputListener(
       sound.playEvent('aiOutput');
     })
   );
+}
+
+/**
+ * AIエージェントによるディスク上のファイル変更の検出 (aiOutput)。
+ *
+ * OpenAI Codex拡張やClaude Code拡張はWebview UIで動作し、ターミナルも
+ * VS Codeのドキュメントも介さずファイルを直接ディスクへ書き込むことがある。
+ * これはonDidChangeTextDocumentに現れないため、FileSystemWatcherで拾う。
+ *
+ * ユーザー由来の書き込みと区別するため:
+ *  - onDidSaveTextDocumentで保存したファイルは直後2秒間ディスク変更を無視
+ *    (手動保存・自動保存の両方をカバー)
+ *  - .git / node_modules / out / dist 等の生成物ディレクトリは無視
+ *    (加えてVS Code共有ウォッチャーはfiles.watcherExcludeも適用する)
+ * git pull等の外部変更でも鳴りうるヒューリスティック。不要ならaiOutputを無音に。
+ */
+function registerAiFileActivityListener(
+  context: vscode.ExtensionContext,
+  sound: SoundService,
+  warmingUp: () => boolean
+): void {
+  const recentSaves = new Map<string, number>();
+  const SAVE_SUPPRESS_MS = 2000;
+  const EXCLUDE = /[\\/](\.git|node_modules|out|dist|build|coverage|\.next|target)[\\/]/;
+  let lastTick = 0;
+  const THROTTLE_MS = 250;
+
+  context.subscriptions.push(
+    vscode.workspace.onDidSaveTextDocument((doc) => {
+      recentSaves.set(doc.uri.toString(), Date.now());
+    })
+  );
+
+  const watcher = vscode.workspace.createFileSystemWatcher('**/*');
+  context.subscriptions.push(watcher);
+
+  const onDiskChange = (uri: vscode.Uri) => {
+    if (warmingUp()) { return; }
+    if (uri.scheme !== 'file') { return; }
+    if (EXCLUDE.test(uri.fsPath)) { return; }
+    const now = Date.now();
+    const savedAt = recentSaves.get(uri.toString()) ?? 0;
+    if (now - savedAt < SAVE_SUPPRESS_MS) { return; } // ユーザー保存由来の変更
+    if (now - lastTick < THROTTLE_MS) { return; }
+    lastTick = now;
+    sound.playEvent('aiOutput');
+  };
+  context.subscriptions.push(watcher.onDidChange(onDiskChange));
+  context.subscriptions.push(watcher.onDidCreate(onDiskChange));
 }
 
 // ============================================================

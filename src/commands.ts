@@ -213,13 +213,19 @@ ${claudeHooks}
 - \`PostToolUse\` → ツール実行のたびの進行音 (\`aiOutput\`)。うるさい場合はこの項目を削除
 - \`Stop\` → 作業完了音 (\`aiComplete\`)
 
-## Codex CLI (notify)
+## OpenAI Codex (CLI / VS Code拡張)
 
-\`~/.codex/config.toml\`:
+Codex拡張 (サイドバーUI) はターミナルを使わないため、自動検出できるのは
+**ファイル編集時の「AI: 応答出力中」音のみ**です (ワークスペースのファイル変更を監視)。
+
+ターン完了音は \`~/.codex/config.toml\` の \`notify\` で鳴らせます
+(CLIと拡張は同じconfig.tomlを参照します):
 
 \`\`\`toml
 ${codexNotify}
 \`\`\`
+
+※ notifyが発火するのはターン完了時のみです (Codexにはhooks機構がありません)。
 
 ## GitHub Copilot
 
