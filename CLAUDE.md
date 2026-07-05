@@ -25,6 +25,7 @@ src/
   audioEngineHost.ts  Audio Engine WebviewViewのHost側 (プリロード/再生命令/診断ping)
   listeners.ts        VS Codeイベント監視 (typing/editor/diagnostics/tasks/terminal)
   settingsPanel.ts    設定画面WebviewPanelのHost側
+  menuView.ts         アクティビティバー (左側) のメニューTreeView
   commands.ts         コマンド実装 (リセット/診断/エクスポート等)
   log.ts              出力チャンネル。debugLog設定でゲート
 media/
@@ -43,6 +44,12 @@ media/
    非表示でもAudioContextが生き続ける。**これが唯一の音声再生経路**。
    ユーザーがビューを閉じる/`popSe.enabled=false` (viewのwhen句) でエンジンは破棄され音は止まる。
 2. **設定画面** (`popSe.settings`): 通常のWebviewPanel。閉じても音は鳴り続ける (要件)。
+
+さらにアクティビティバー (左側) に **メニューTreeView** (`popSe.menu`, menuView.ts) がある。
+これは音を鳴らさない純粋な入口UI (状態表示 + コマンド起動のみ)。
+Audio Engineをサイドバーに置かないのは、サイドバービューは初回表示までresolveされず
+起動時の自動初期化がパネルより不安定になるため。エンジン稼働状態の表示は
+ビュー可視時のみ3秒ポーリングで追従 (extension.ts)。
 
 WebviewViewは一度表示されるまでresolveされないため、起動1.5秒後に
 `popSe.audioEngine.focus` → `workbench.action.focusActiveEditorGroup` で一度だけ初期化する

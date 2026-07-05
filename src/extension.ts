@@ -4,6 +4,7 @@ import { SoundService } from './soundService';
 import { registerAllListeners } from './listeners';
 import { registerCommands } from './commands';
 import { SettingsPanel } from './settingsPanel';
+import { MenuViewProvider, MENU_VIEW_ID } from './menuView';
 import { getSettings } from './config';
 import { debug, initLog, setDebugEnabled } from './log';
 
@@ -25,6 +26,24 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const sound = new SoundService(engine);
 
+  // アクティビティバー (左側) のメニュー
+  const menu = new MenuViewProvider(engine);
+  const menuView = vscode.window.createTreeView(MENU_VIEW_ID, { treeDataProvider: menu });
+  context.subscriptions.push(menuView);
+  // エンジン稼働状態は設定イベントを発しないため、ビューが見えている間だけ定期更新する
+  let menuTimer: NodeJS.Timeout | undefined;
+  const updateMenuPolling = () => {
+    if (menuView.visible && !menuTimer) {
+      menuTimer = setInterval(() => menu.refresh(), 3000);
+    } else if (!menuView.visible && menuTimer) {
+      clearInterval(menuTimer);
+      menuTimer = undefined;
+    }
+  };
+  context.subscriptions.push(menuView.onDidChangeVisibility(updateMenuPolling));
+  context.subscriptions.push({ dispose: () => { if (menuTimer) { clearInterval(menuTimer); } } });
+  updateMenuPolling();
+
   registerAllListeners(context, sound);
   registerCommands(context, engine, sound, () =>
     SettingsPanel.createOrShow(context.extensionUri, engine!, sound)
@@ -38,6 +57,7 @@ export function activate(context: vscode.ExtensionContext): void {
       setDebugEnabled(s.debugLog);
       sound.refresh();
       SettingsPanel.refreshIfOpen();
+      menu.refresh();
       // 無効→有効に戻したときはエンジンビューを再初期化する
       // (無効化中はwhen句によりビューごと破棄されているため)
       if (e.affectsConfiguration('popSe.enabled') && s.enabled && engine && !engine.isRunning()) {

@@ -25,6 +25,13 @@
   ],
   "contributes": {
     "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "popSeSidebar",
+          "title": "Pop SE",
+          "icon": "media/icon.svg"
+        }
+      ],
       "panel": [
         {
           "id": "popSeEngine",
@@ -34,6 +41,12 @@
       ]
     },
     "views": {
+      "popSeSidebar": [
+        {
+          "id": "popSe.menu",
+          "name": "Sound Theme Engine"
+        }
+      ],
       "popSeEngine": [
         {
           "type": "webview",
